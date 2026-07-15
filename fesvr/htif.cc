@@ -191,7 +191,8 @@ void htif_t::load_symbols(std::map<std::string, uint64_t>& symbols)
   for (auto &s : symbol_elfs) {
     std::map<std::string, uint64_t> other_symbols = load_elf(s.c_str(), &nop_memif, &nop_entry,
                                                              expected_xlen);
-    symbols.merge(other_symbols);
+    //symbols.merge(other_symbols);
+    symbols.insert(other_symbols.begin(), other_symbols.end());
   }
 
   // detect torture tests so we can print the memory signature at the end
@@ -239,7 +240,8 @@ const char* htif_t::get_symbol(uint64_t addr)
 }
 
 bool htif_t::should_exit() const {
-  return signal_exit || exitcode.has_value();
+  //return signal_exit || exitcode;
+  return signal_exit || (bool)exitcode;
 }
 
 void htif_t::htif_exit(int exit_code) {

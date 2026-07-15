@@ -116,8 +116,8 @@ reg_t base_pmpaddr_csr_t::napot_mask() const noexcept {
 }
 
 bool base_pmpaddr_csr_t::match4(reg_t addr) const noexcept {
-  if (proc->extension_enabled_const(EXT_SSPMPEN) && (pmpidx >= proc->n_pmp)) {
-    if (!((state->spmpen->read() >> (pmpidx - proc->n_pmp)) & 1))
+  if (proc->extension_enabled_const(EXT_SSPMPEN) && (pmpidx+1 >= proc->n_pmp)) {
+    if (!((state->spmpen->read() >> pmpidx) & 1))
       return false;
   }
 
@@ -129,8 +129,8 @@ bool base_pmpaddr_csr_t::match4(reg_t addr) const noexcept {
 }
 
 bool base_pmpaddr_csr_t::subset_match(reg_t addr, reg_t len) const noexcept {
-  if (proc->extension_enabled_const(EXT_SSPMPEN) && (pmpidx >= proc->n_pmp)) {
-    if (!((state->spmpen->read() >> (pmpidx - proc->n_pmp)) & 1))
+  if (proc->extension_enabled_const(EXT_SSPMPEN) && (pmpidx+1 >= proc->n_pmp)) {
+    if (!((state->spmpen->read() >> pmpidx) & 1))
       return false;
   }
 
@@ -590,7 +590,7 @@ reg_t base_status_csr_t::compute_sstatus_write_mask() const noexcept {
   const bool has_vs = proc->any_vector_extensions();
   return 0
     | (proc->extension_enabled('S') ? (SSTATUS_SIE | SSTATUS_SPIE | SSTATUS_SPP) : 0)
-    | (has_page || proc->extension_enabled_const(EXT_SSPMP)? (SSTATUS_SUM | SSTATUS_MXR) : 0)
+    | (has_page ? (SSTATUS_SUM | SSTATUS_MXR) : 0)
     | (has_fs ? SSTATUS_FS : 0)
     | (proc->any_custom_extensions() ? SSTATUS_XS : 0)
     | (has_vs ? SSTATUS_VS : 0)
@@ -1147,10 +1147,8 @@ bool medeleg_csr_t::unlogged_write(const reg_t val) noexcept {
     | (1 << CAUSE_SUPERVISOR_ECALL)
     | (proc->has_mmu() ? mmu_exceptions : 0)
     | (proc->extension_enabled('H') ? hypervisor_exceptions : 0)
-    | ((proc->extension_enabled(EXT_ZICFISS) || proc->extension_enabled(EXT_ZICFILP))?
-        (1 << CAUSE_SOFTWARE_CHECK_FAULT) : 0)
-    | (proc->extension_enabled(EXT_ZICNTR)?
-        (1 << CAUSE_HARDWARE_ERROR_FAULT) : 0)
+    | (1 << CAUSE_SOFTWARE_CHECK_FAULT)
+    | (1 << CAUSE_HARDWARE_ERROR_FAULT)
     ;
   return basic_csr_t::unlogged_write(val & mask);
 }
@@ -1754,13 +1752,12 @@ vxsat_csr_t::vxsat_csr_t(processor_t* const proc, const reg_t addr):
 }
 
 void vxsat_csr_t::verify_permissions(insn_t insn, bool write) const {
-  require(!proc->any_vector_extensions() || STATE.sstatus->enabled(SSTATUS_VS));
+  require(proc->any_vector_extensions() && STATE.sstatus->enabled(SSTATUS_VS));
   masked_csr_t::verify_permissions(insn, write);
 }
 
 bool vxsat_csr_t::unlogged_write(const reg_t val) noexcept {
-  if (proc->any_vector_extensions())
-    STATE.sstatus->dirty(SSTATUS_VS);
+  STATE.sstatus->dirty(SSTATUS_VS);
   return masked_csr_t::unlogged_write(val);
 }
 
@@ -2123,7 +2120,8 @@ reg_t smcntrpmf_csr_t::read_prev() const noexcept {
 }
 
 void smcntrpmf_csr_t::reset_prev() noexcept {
-  prev_val.reset();
+  //prev_val.reset();
+  prev_val = {};
 }
 
 bool smcntrpmf_csr_t::unlogged_write(const reg_t val) noexcept {

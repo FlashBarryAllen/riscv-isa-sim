@@ -269,7 +269,7 @@ void processor_t::step(size_t n)
 
           if (!state.serialized && check_triggers_icount) {
             auto match = TM.detect_icount_match();
-            if (match.has_value()) {
+            if (match) {
               assert(match->timing == triggers::TIMING_BEFORE);
               throw triggers::matched_t((triggers::operation_t)0, 0, match->action, state.v);
             }
@@ -336,7 +336,7 @@ void processor_t::step(size_t n)
       }
       // Trigger action takes priority over single step
       auto match = TM.detect_trap_match(t);
-      if (match.has_value())
+      if (match)
         take_trigger_action(match->action, 0, state.pc, 0);
       else if (unlikely(state.single_step == state.STEP_STEPPED)) {
         state.single_step = state.STEP_NONE;

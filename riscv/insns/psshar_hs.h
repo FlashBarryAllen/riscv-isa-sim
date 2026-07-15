@@ -3,8 +3,8 @@ P_RD_RS1_LOOP(16, 16, {
   if (p_rs1 == 0)
     p_rd = 0;
   else if (sshamt >= 16) {
-    p_rd = (p_rs1 & 0x8000) ? INT16_MIN : INT16_MAX;
-    P.set_vxsat();
+    p_rd = (p_rs1 & 0x8000) ? 0x8000 : 0x7fff;
+    P.VU.vxsat->write(1);
   }
   else if (sshamt <= -16)
     p_rd = 0;

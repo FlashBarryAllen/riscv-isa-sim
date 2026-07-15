@@ -78,7 +78,11 @@ plic_t::plic_t(const simif_t* sim, uint32_t ndev)
   max_prio((1UL << PLIC_PRIO_BITS) - 1), priority{}, level{}
 {
   // PLIC contexts are contiguous in memory even if harts are discontiguous.
-  for (const auto& [hart_id, hart] : sim->get_harts()) {
+  // 1. 先用传统的隐式引用迭代
+for (const auto& kv : sim->get_harts()) {
+    // 2. 在循环体内部，手动把 first 和 second 映射到原本的变量名上
+    const auto& hart_id = kv.first;
+    const auto& hart = kv.second;
     contexts.push_back(plic_context_t(hart, true));
 
     if (hart->extension_enabled_const('S')) {

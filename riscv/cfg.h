@@ -2,11 +2,18 @@
 #ifndef _RISCV_CFG_H
 #define _RISCV_CFG_H
 
-#include <optional>
+#include <experimental/optional>
 #include <vector>
 #include "decode.h"
 #include <cassert>
 #include <map>
+
+namespace std {
+    template<typename T>
+    using optional = std::experimental::optional<T>;
+    //constexpr auto nullopt = std::experimental::nullopt;
+}
+
 class abstract_sim_if_t;
 
 typedef enum {

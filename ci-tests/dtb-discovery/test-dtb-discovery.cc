@@ -213,7 +213,7 @@ bool run_test(const std::string& dtb_path, bool dtb_discovery,
             dtb_path.c_str(),
             false,
             nullptr,
-            std::nullopt);
+            {});
 
   // Compare devices
   bool result = compare_devices(sim, expected);

@@ -88,6 +88,17 @@ void state_t::csr_init(processor_t* const proc, reg_t max_isa)
       add_csr(CSR_MCYCLECFG, mcyclecfg);
       add_csr(CSR_MINSTRETCFG, minstretcfg);
     }
+    if (proc->extension_enabled_const(EXT_SMCDELEG)) {
+      if (xlen == 32) {
+        cyclecfg = std::make_shared<counter_proxy_csr_t>(proc, CSR_MCYCLECFG, csrmap[CSR_MCYCLECFG]);
+        cyclecfgh = std::make_shared<counter_proxy_csr_t>(proc, CSR_MCYCLECFGH, csrmap[CSR_MCYCLECFGH]);
+        instretcfg = std::make_shared<counter_proxy_csr_t>(proc, CSR_MINSTRETCFG, csrmap[CSR_MINSTRETCFG]);
+        instretcfgh = std::make_shared<counter_proxy_csr_t>(proc, CSR_MINSTRETCFGH, csrmap[CSR_MINSTRETCFGH]);
+      } else {
+        instretcfg = std::make_shared<counter_proxy_csr_t>(proc, CSR_MINSTRETCFG, csrmap[CSR_MINSTRETCFG]);
+        cyclecfg = std::make_shared<counter_proxy_csr_t>(proc, CSR_MCYCLECFG, csrmap[CSR_MCYCLECFG]);
+      }
+    }
   }
   for (reg_t i = 0; i < N_HPMCOUNTERS; ++i) {
     const reg_t which_mevent = CSR_MHPMEVENT3 + i;
@@ -265,10 +276,8 @@ void state_t::csr_init(processor_t* const proc, reg_t max_isa)
     (1 << CAUSE_FETCH_PAGE_FAULT) |
     (1 << CAUSE_LOAD_PAGE_FAULT) |
     (1 << CAUSE_STORE_PAGE_FAULT) |
-    ((proc->extension_enabled(EXT_ZICFISS) || proc->extension_enabled(EXT_ZICFILP))?
-     (1 << CAUSE_SOFTWARE_CHECK_FAULT) : 0) |
-    (proc->extension_enabled(EXT_ZICNTR)?
-     (1 << CAUSE_HARDWARE_ERROR_FAULT) : 0);
+    (1 << CAUSE_SOFTWARE_CHECK_FAULT) |
+    (1 << CAUSE_HARDWARE_ERROR_FAULT);
   add_hypervisor_csr(CSR_HEDELEG, hedeleg = std::make_shared<masked_csr_t>(proc, CSR_HEDELEG, hedeleg_mask, 0));
   add_hypervisor_csr(CSR_HCOUNTEREN, hcounteren = std::make_shared<masked_csr_t>(proc, CSR_HCOUNTEREN, counteren_mask, 0));
   htimedelta = std::make_shared<basic_csr_t>(proc, CSR_HTIMEDELTA, 0);
@@ -332,10 +341,6 @@ void state_t::csr_init(processor_t* const proc, reg_t max_isa)
   add_csr(CSR_FRM, frm = std::make_shared<float_csr_t>(proc, CSR_FRM, FSR_RD >> FSR_RD_SHIFT, 0));
   assert(FSR_AEXC_SHIFT == 0);  // composite_csr_t assumes fflags begins at bit 0
   add_csr(CSR_FCSR, std::make_shared<composite_csr_t>(proc, CSR_FCSR, frm, fflags, FSR_RD_SHIFT));
-
-  if (proc->extension_enabled('P') || proc->any_vector_extensions()) {
-    add_csr(CSR_VXSAT, vxsat = std::make_shared<vxsat_csr_t>(proc, CSR_VXSAT));
-  }
 
   add_ext_csr(EXT_ZKR, CSR_SEED, std::make_shared<seed_csr_t>(proc, CSR_SEED));
 
@@ -450,7 +455,7 @@ void state_t::csr_init(processor_t* const proc, reg_t max_isa)
     add_supervisor_csr(CSR_SISELECT, std::make_shared<virtualized_with_special_permission_csr_t>(proc, siselect, vsiselect));
 
     const reg_t vsireg_csrs[] = { CSR_VSIREG, CSR_VSIREG2, CSR_VSIREG3, CSR_VSIREG4, CSR_VSIREG5, CSR_VSIREG6 };
-    for (size_t i = 0; i < std::size(vsireg_csrs); i++) {
+    for (size_t i = 0; i < 6; i++) {
       add_hypervisor_csr(vsireg_csrs[i], vsireg[i] = std::make_shared<sscsrind_reg_csr_t>(proc, vsireg_csrs[i], vsiselect));
     }
 
@@ -471,7 +476,7 @@ void state_t::csr_init(processor_t* const proc, reg_t max_isa)
     }
 
     const reg_t sireg_csrs[] = { CSR_SIREG2, CSR_SIREG3, CSR_SIREG4, CSR_SIREG5, CSR_SIREG6 };
-    for (size_t i = 0; i < std::size(sireg_csrs); i++) {
+    for (size_t i = 0; i < 5; i++) {
       auto ireg_idx = sireg_csrs[i] - CSR_SIREG;
       auto sireg = nonvirtual_sireg[ireg_idx] = std::make_shared<sscsrind_reg_csr_t>(proc, sireg_csrs[i], siselect);
       add_supervisor_csr(sireg_csrs[i], std::make_shared<virtualized_indirect_csr_t>(proc, nonvirtual_sireg[ireg_idx], vsireg[ireg_idx]));
@@ -493,37 +498,25 @@ void state_t::csr_init(processor_t* const proc, reg_t max_isa)
           break;
           case CSR_SIREG2:
             if (proc->extension_enabled_const(EXT_ZICNTR)) {
-              // describe address as that of CYCLE rather than MCYCLECFG,
-              // so that perm checks and mcounteren checks do the right thing
-              auto cyclecfg_proxy = std::make_shared<counter_proxy_csr_t>(proc, CSR_CYCLE, csrmap[CSR_MCYCLECFG]);
-              sireg->add_ireg_proxy(SISELECT_SMCDELEG_START, cyclecfg_proxy);
-
-              auto instretcfg_proxy = std::make_shared<counter_proxy_csr_t>(proc, CSR_INSTRET, csrmap[CSR_MINSTRETCFG]);
-              sireg->add_ireg_proxy(SISELECT_SMCDELEG_INSTRETCFG, instretcfg_proxy);
+                sireg->add_ireg_proxy(SISELECT_SMCDELEG_START, cyclecfg);
+                sireg->add_ireg_proxy(SISELECT_SMCDELEG_INSTRETCFG, instretcfg);
             }
             if (proc->extension_enabled_const(EXT_ZIHPM)) {
-              for (size_t j = 0; j < (SISELECT_SMCDELEG_END - SISELECT_SMCDELEG_HPMEVENT_3 + 1); j++) {
-                auto proxy = std::make_shared<counter_proxy_csr_t>(proc, CSR_HPMCOUNTER3 + j, csrmap[CSR_MHPMEVENT3 + j]);
-                sireg->add_ireg_proxy(SISELECT_SMCDELEG_HPMEVENT_3 + j, proxy);
-              }
+              for (size_t j = 0; j < (SISELECT_SMCDELEG_END - SISELECT_SMCDELEG_HPMEVENT_3 + 1); j++)
+                sireg->add_ireg_proxy(SISELECT_SMCDELEG_HPMEVENT_3 + j, csrmap[CSR_MHPMEVENT3 + j]);
             }
             break;
           case CSR_SIREG5:
             if (xlen == 32) {
               // cyclecfgh/instretcfgh
               if (proc->extension_enabled_const(EXT_ZICNTR) && proc->extension_enabled_const(EXT_SMCNTRPMF)) {
-                auto cyclecfgh_proxy = std::make_shared<counter_proxy_csr_t>(proc, CSR_CYCLEH, csrmap[CSR_MCYCLECFGH]);
-                sireg->add_ireg_proxy(SISELECT_SMCDELEG_START, cyclecfgh_proxy);
-
-                auto instretcfgh_proxy = std::make_shared<counter_proxy_csr_t>(proc, CSR_INSTRETH, csrmap[CSR_MINSTRETCFGH]);
-                sireg->add_ireg_proxy(SISELECT_SMCDELEG_INSTRET, instretcfgh_proxy);
+                sireg->add_ireg_proxy(SISELECT_SMCDELEG_START, cyclecfgh);
+                sireg->add_ireg_proxy(SISELECT_SMCDELEG_INSTRET, instretcfgh);
               }
               // hpmevent3h-hpmevent31h
               if (proc->extension_enabled_const(EXT_ZIHPM) && proc->extension_enabled_const(EXT_SSCOFPMF)) {
-                for (size_t j = 0; j < (SISELECT_SMCDELEG_END - SISELECT_SMCDELEG_HPMEVENT_3); j++) {
-                  auto proxy = std::make_shared<counter_proxy_csr_t>(proc, CSR_HPMCOUNTER3H + j, csrmap[CSR_MHPMEVENT3H + j]);
-                  sireg->add_ireg_proxy(SISELECT_SMCDELEG_HPMEVENT_3 + j, proxy);
-                }
+                for (size_t j = 0; j < (SISELECT_SMCDELEG_END - SISELECT_SMCDELEG_HPMEVENT_3); j++)
+                  sireg->add_ireg_proxy(SISELECT_SMCDELEG_HPMEVENT_3 + j, csrmap[CSR_MHPMEVENT3H + j]);
               }
             }
           case CSR_SIREG3:

@@ -1,0 +1,54 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Spike Core 0 调试 (rot13)",
+            "type": "cortex-debug",
+            "request": "launch",
+            "servertype": "openocd",
+            "executable": "${workspaceFolder}/ci-tests/rot13",
+            "cwd": "${workspaceFolder}",
+            "gdbPath": "/root/tools/riscv64-gnu-toolchain/bin/riscv64-unknown-elf-gdb",
+            "configFiles": [
+                "${workspaceFolder}/ci-tests/spike.cfg"
+            ],
+            "searchDir": [
+                "${workspaceFolder}/ci-tests"
+            ],
+            "interface": "jtag",
+            "gdbTarget": "localhost:50000",
+            "overrideLaunchCommands": [
+                "monitor halt",
+                "load",
+                "monitor arm semihosting enable",
+                "set $sp=0x2fff0",
+                "break main"
+            ]
+        },
+        {
+            "name": "Spike Core 1 调试 (rot13)",
+            "type": "cortex-debug",
+            "request": "launch",
+            "servertype": "external",
+            "executable": "${workspaceFolder}/ci-tests/rot13",
+            "cwd": "${workspaceFolder}",
+            "gdbPath": "/root/tools/riscv64-gnu-toolchain/bin/riscv64-unknown-elf-gdb",
+            "gdbTarget": "localhost:60001\ndefined_but_ignored\ntarget remote localhost:60001",
+            "overrideLaunchCommands": [
+                "monitor halt",
+                "set $sp=0x1fff0",
+                "set $pc=main",
+                "break main"
+            ]
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Spike 双核联合调试",
+            "configurations": [
+                "Spike Core 0 调试 (rot13)",
+                "Spike Core 1 调试 (rot13)"
+            ]
+        }
+    ]
+}

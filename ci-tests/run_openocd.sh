@@ -1,0 +1,2 @@
+#!/bin/sh
+openocd -c "gdb_port 60000" -c "tcl_port 60001" -c "telnet_port 60002" -s /00_ycl/00_code/riscv-isa-sim/ci-tests -f /root/.vscode-server/extensions/marus25.cortex-debug-1.12.1/support/openocd-helpers.tcl -f /00_ycl/00_code/riscv-isa-sim/ci-tests/spike.cfg

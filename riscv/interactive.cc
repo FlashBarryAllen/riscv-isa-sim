@@ -256,14 +256,14 @@ static std::string readline(int fd)
 void sim_t::interactive()
 {
   if (ctrlc_pressed) {
-    next_interactive_action = std::nullopt;
+    next_interactive_action = {};
     ctrlc_pressed = false;
   }
 
-  if (next_interactive_action.has_value()) {
+  if (next_interactive_action) {
     ctrlc_pressed = false;
     auto f = next_interactive_action.value();
-    next_interactive_action = std::nullopt;
+    next_interactive_action = {};
     return f();
   }
 
@@ -355,7 +355,7 @@ void sim_t::interactive()
       socketif->wout(); // socket output, if required
 #endif
 
-    if (next_interactive_action.has_value())
+    if (next_interactive_action)
       break;
   }
   ctrlc_pressed = false;

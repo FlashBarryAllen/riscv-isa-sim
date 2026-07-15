@@ -11,12 +11,18 @@
 // For std::shared_ptr
 #include <memory>
 // For std::optional
-#include <optional>
+#include <experimental/optional>
 // For access_type:
 #include "memtracer.h"
 #include <cassert>
 // For std::optional
-#include <optional>
+#include <experimental/optional>
+
+namespace std {
+    template<typename T>
+    using optional = std::experimental::optional<T>;
+    //constexpr auto nullopt = std::experimental::nullopt;
+}
 
 class processor_t;
 struct state_t;

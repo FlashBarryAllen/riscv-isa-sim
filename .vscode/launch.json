@@ -1,0 +1,30 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Spike 图形化半自动调试 (rot13)",
+            "type": "cortex-debug",
+            "request": "launch",
+            "servertype": "openocd",
+            "executable": "${workspaceFolder}/ci-tests/rot13",
+            "cwd": "${workspaceFolder}",
+            "gdbPath": "/root/tools/riscv64-gnu-toolchain/bin/riscv64-unknown-elf-gdb",
+            "configFiles": [
+                "${workspaceFolder}/ci-tests/spike_rot13.cfg"
+                //"${workspaceFolder}/ci-tests/spike.cfg"
+            ],
+            "searchDir": [
+                "${workspaceFolder}/ci-tests"
+            ],
+            "interface": "jtag",
+            "gdbTarget": "localhost:50000",
+            "overrideLaunchCommands": [
+                "monitor halt",
+                "load",
+                "monitor arm semihosting enable",
+                "set $sp=0x2fff0",
+                "break main"
+            ]
+        }
+    ]
+}

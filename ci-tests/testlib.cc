@@ -37,6 +37,6 @@ int main(int argc, char **argv) {
             nullptr,
             false,
             nullptr,
-            std::nullopt);
+            {});
   sim.run();
 }

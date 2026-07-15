@@ -248,7 +248,7 @@ std::optional<match_result_t> mcontrol_common_t::detect_memory_access_match(
       (operation == triggers::OPERATION_STORE && !store) ||
       (operation == triggers::OPERATION_LOAD && !load) ||
       !common_match(proc)) {
-    return std::nullopt;
+    return {};
   }
 
   auto xlen = proc->get_xlen();
@@ -262,20 +262,20 @@ std::optional<match_result_t> mcontrol_common_t::detect_memory_access_match(
         return match_result_t(timing_t(timing), action);
       }
 
-    return std::nullopt;
+    return {};
   }
 
   if (len * 8 > proc->get_xlen())
-    return std::nullopt;
+    return {};
 
-  if (data.has_value() && simple_match(xlen, data.value())) {
+  if (data && simple_match(xlen, data.value())) {
     /* This is OK because this function is only called if the trigger was
       * not inhibited by the previous trigger in the chain. */
     set_hit(timing ? HIT_IMMEDIATELY_AFTER : HIT_BEFORE);
     return match_result_t(timing_t(timing), action);
   }
 
-  return std::nullopt;
+  return {};
 }
 
 mcontrol_common_t::match_t mcontrol_common_t::legalize_match(reg_t val, reg_t maskmax) noexcept
@@ -362,9 +362,9 @@ void mcontrol6_t::tdata1_write(processor_t * const proc, const reg_t val, const 
 std::optional<match_result_t> icount_t::detect_icount_fire(processor_t * const proc) noexcept
 {
   if (!common_match(proc))
-    return std::nullopt;
+    return {};
 
-  std::optional<match_result_t> ret = std::nullopt;
+  std::optional<match_result_t> ret = {};
   if (pending) {
     pending = 0;
     hit = true;
@@ -462,7 +462,7 @@ std::optional<match_result_t> trap_common_t::detect_trap_match(processor_t * con
 {
   // Use the previous privilege for matching
   if (!common_match(proc, true))
-    return std::nullopt;
+    return {};
 
   auto xlen = proc->get_xlen();
   bool interrupt = (t.cause() & ((reg_t)1 << (xlen - 1))) != 0;
@@ -472,7 +472,7 @@ std::optional<match_result_t> trap_common_t::detect_trap_match(processor_t * con
     hit = true;
     return match_result_t(TIMING_AFTER, action);
   }
-  return std::nullopt;
+  return {};
 }
 
 bool itrigger_t::simple_match(bool interrupt, reg_t bit) const
@@ -613,11 +613,11 @@ std::optional<match_result_t> module_t::detect_memory_access_match(
 {
   state_t * const state = proc->get_state();
   if (state->debug_mode)
-    return std::nullopt;
+    return {};
 
   bool chain_ok = true;
 
-  std::optional<match_result_t> ret = std::nullopt;
+  std::optional<match_result_t> ret = {};
   for (auto trigger: triggers) {
     if (!chain_ok) {
       chain_ok = !trigger->get_chain();
@@ -631,10 +631,10 @@ std::optional<match_result_t> module_t::detect_memory_access_match(
      * trigger in the chain will never get `hit` set unless the entire chain
      * matches. */
     auto result = trigger->detect_memory_access_match(proc, operation, address, len, data);
-    if (result.has_value() && !trigger->get_chain() && (!ret.has_value() || ret->action < result->action))
+    if (result && !trigger->get_chain() && (!ret || ret->action < result->action))
       ret = result;
 
-    chain_ok = result.has_value() || !trigger->get_chain();
+    chain_ok = result || !trigger->get_chain();
   }
   return ret;
 }
@@ -646,15 +646,16 @@ std::optional<match_result_t> module_t::detect_icount_match() noexcept
 
   state_t * const state = proc->get_state();
   if (state->debug_mode)
-    return std::nullopt;
+    return {};
 
-  std::optional<match_result_t> ret = std::nullopt;
+  std::optional<match_result_t> ret = {};
   for (auto trigger: triggers) {
     auto result = trigger->detect_icount_fire(proc);
-    if (result.has_value() && (!ret.has_value() || ret->action < result->action))
+    if (result && (!ret || ret->action < result->action))
       ret = result;
   }
-  if (ret == std::nullopt || ret->action != MCONTROL_ACTION_DEBUG_MODE)
+  //if (ret == {} || ret->action != MCONTROL_ACTION_DEBUG_MODE)
+  if (!ret || ret->action != MCONTROL_ACTION_DEBUG_MODE)
     for (auto trigger: triggers)
       trigger->detect_icount_decrement(proc);
   return ret;
@@ -664,12 +665,12 @@ std::optional<match_result_t> module_t::detect_trap_match(const trap_t& t) noexc
 {
   state_t * const state = proc->get_state();
   if (state->debug_mode)
-    return std::nullopt;
+    return {};
 
-  std::optional<match_result_t> ret = std::nullopt;
+  std::optional<match_result_t> ret = {};
   for (auto trigger: triggers) {
     auto result = trigger->detect_trap_match(proc, t);
-    if (result.has_value() && (!ret.has_value() || ret->action < result->action))
+    if (result && (!ret || ret->action < result->action))
       ret = result;
   }
   return ret;

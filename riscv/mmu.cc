@@ -106,7 +106,8 @@ mmu_t::insn_parcel_t mmu_t::fetch_slow_path(reg_t vaddr)
 {
   if (matched_trigger) {
     auto trig = matched_trigger.value();
-    matched_trigger.reset();
+    //matched_trigger.reset();
+    matched_trigger = {};
     throw trig;
   }
 
@@ -158,8 +159,21 @@ static reg_t reg_from_bytes(size_t len, const uint8_t* bytes)
   return res;
 }
 
+bool mmu_t::mmio_ok(reg_t paddr, access_type UNUSED type)
+{
+  // Disallow access to debug region when not in debug mode
+  reg_t debug_start = DEBUG_START; // suppress -Wtype-limits
+  if (paddr >= debug_start && paddr - debug_start < DEBUG_SIZE && proc && !proc->state.debug_mode)
+    return false;
+
+  return true;
+}
+
 bool mmu_t::mmio_fetch(reg_t paddr, size_t len, uint8_t* bytes)
 {
+  if (!mmio_ok(paddr, FETCH))
+    return false;
+
   return sim->mmio_fetch(paddr, len, bytes);
 }
 
@@ -179,6 +193,9 @@ bool mmu_t::mmio(reg_t paddr, size_t len, uint8_t* bytes, access_type type)
   bool naturally_aligned = (paddr & (len - 1)) == 0;
 
   if (power_of_2 && naturally_aligned) {
+    if (!mmio_ok(paddr, type))
+      return false;
+
     if (type == STORE)
       return sim->mmio_store(paddr, len, bytes);
     else
@@ -204,7 +221,7 @@ void mmu_t::check_triggers(triggers::operation_t operation,
 void mmu_t::check_triggers(triggers::operation_t operation,
   reg_t addr, bool virt, size_t access_len)
 {
-  check_triggers(operation, addr, virt, access_len, std::nullopt);
+  check_triggers(operation, addr, virt, access_len, {});
 }
 
 void mmu_t::check_triggers(triggers::operation_t operation, reg_t address, bool virt, std::size_t size, std::optional<reg_t> data)
@@ -213,7 +230,7 @@ void mmu_t::check_triggers(triggers::operation_t operation, reg_t address, bool 
     return;
 
   auto match = proc->TM.detect_memory_access_match(operation, address, size, data);
-  if (!match.has_value())
+  if (!match)
     return;
 
   switch (match->timing) {
@@ -513,21 +530,15 @@ std::optional<base_pmpaddr_csr_t*> mmu_t::pmp_lookup(reg_t addr, reg_t len, size
     }
   }
 
-  return std::nullopt;
+  return {};
 }
 
 bool mmu_t::pmp_ok(reg_t addr, reg_t len, access_type type, reg_t mode, bool hlvx)
 {
-  // The debug module implementation relies on firmware (ROM) owned by spike.
-  // The Debug Module address region is hidden from normal software.
-  // A hart can access it only in debug mode.
-  if (proc && sim && sim->is_debug_module_access(addr, len))
-    return proc->state.debug_mode;
-
   if (!proc || proc->n_pmp == 0)
     return true;
 
-  if (auto pmp = pmp_lookup(addr, len, 0, proc->n_pmp); pmp.has_value())
+  if (auto pmp = pmp_lookup(addr, len, 0, proc->n_pmp); pmp)
     return (*pmp)->access_ok(type, mode, hlvx);
 
   // in case matching region is not found
@@ -542,7 +553,7 @@ bool mmu_t::spmp_ok(reg_t addr, reg_t len, access_type type, reg_t mode)
   if (!proc)
     return true;
 
-  if (auto pmp = pmp_lookup(addr, len, proc->n_pmp, proc->state.max_pmp - proc->n_pmp); pmp.has_value())
+  if (auto pmp = pmp_lookup(addr, len, proc->n_pmp, proc->state.max_pmp - proc->n_pmp); pmp)
     return (*pmp)->access_ok(type, mode, false);
 
   return true;

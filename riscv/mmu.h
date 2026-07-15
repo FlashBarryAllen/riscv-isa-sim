@@ -268,10 +268,8 @@ public:
 
     if (sim->reservable(paddr))
       return load_reservation_address == paddr;
-
-    // SC to non-reservable region: report the PMM-masked effective vaddr.
-    auto access_info = generate_access_info(vaddr, STORE, {});
-    throw trap_store_access_fault(access_info.effective_virt, access_info.transformed_vaddr, 0, 0);
+    else
+      throw trap_store_access_fault((proc) ? proc->state.v : false, vaddr, 0, 0);
   }
 
   template<typename T>
@@ -444,6 +442,7 @@ private:
   bool mmio_load(reg_t paddr, size_t len, uint8_t* bytes);
   bool mmio_store(reg_t paddr, size_t len, const uint8_t* bytes);
   bool mmio(reg_t paddr, size_t len, uint8_t* bytes, access_type type);
+  bool mmio_ok(reg_t paddr, access_type type);
 
   void check_triggers(triggers::operation_t operation,
     reg_t addr, bool virt, std::size_t data_size, const std::uint8_t* bytes);

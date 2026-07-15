@@ -27,6 +27,8 @@ void bus_t::add_device(reg_t addr, abstract_device_t* dev)
   if (size == 0)
     return;
 
+  std::cout << "addr: " << std::hex << addr << ", size: " << size  << std::endl;
+
   // Reject devices that overflow address size
   if (addr + size - 1 < addr) {
     fprintf(stderr, "device at [%" PRIx64 ", %" PRIx64 ") overflows address size\n",

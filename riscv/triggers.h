@@ -2,9 +2,15 @@
 #define _RISCV_TRIGGERS_H
 
 #include <vector>
-#include <optional>
+#include <experimental/optional>
 
 #include "decode.h"
+
+namespace std {
+    template<typename T>
+    using optional = std::experimental::optional<T>;
+    //constexpr auto nullopt = std::experimental::nullopt;
+}
 
 namespace triggers {
 
@@ -91,10 +97,10 @@ public:
   virtual void stash_read_values() {}
 
   virtual std::optional<match_result_t> detect_memory_access_match(processor_t UNUSED * const proc,
-      operation_t UNUSED operation, reg_t UNUSED address, std::size_t UNUSED len, std::optional<reg_t> UNUSED data) noexcept { return std::nullopt; }
-  virtual std::optional<match_result_t> detect_icount_fire(processor_t UNUSED * const proc) { return std::nullopt; }
+      operation_t UNUSED operation, reg_t UNUSED address, std::size_t UNUSED len, std::optional<reg_t> UNUSED data) noexcept { return {}; }
+  virtual std::optional<match_result_t> detect_icount_fire(processor_t UNUSED * const proc) { return {}; }
   virtual void detect_icount_decrement(processor_t UNUSED * const proc) {}
-  virtual std::optional<match_result_t> detect_trap_match(processor_t UNUSED * const proc, const trap_t UNUSED & t) noexcept { return std::nullopt; }
+  virtual std::optional<match_result_t> detect_trap_match(processor_t UNUSED * const proc, const trap_t UNUSED & t) noexcept { return {}; }
 
 protected:
   static action_t legalize_action(reg_t val, reg_t action_mask, reg_t dmode_mask) noexcept;
@@ -125,14 +131,14 @@ private:
     static unsigned warlize_if_h[8] = { 0, 1, 2, 0, 4, 5, 6, 4 };  // 3,7 downgrade
     static unsigned warlize_no_h[8] = { 0, 0, 0, 0, 4, 4, 4, 4 };  // only 0,4 legal
     static std::optional<mhselect_interpretation> table[8] = {
-      mhselect_interpretation{ 0, MHSELECT_MODE_IGNORE, std::nullopt },
+      mhselect_interpretation{ 0, MHSELECT_MODE_IGNORE, {} },
       mhselect_interpretation{ 1, MHSELECT_MODE_MCONTEXT, true },
       mhselect_interpretation{ 2, MHSELECT_MODE_VMID, true },
-      std::nullopt,
+      {},
       mhselect_interpretation{ 4, MHSELECT_MODE_MCONTEXT, false },
       mhselect_interpretation{ 5, MHSELECT_MODE_MCONTEXT, true },
       mhselect_interpretation{ 6, MHSELECT_MODE_VMID, true },
-      std::nullopt
+      {}
     };
     assert(mhselect < 8);
     unsigned legal = h_enabled ? warlize_if_h[mhselect] : warlize_no_h[mhselect];

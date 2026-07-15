@@ -150,7 +150,6 @@ void processor_t::reset()
 {
   xlen = isa.get_max_xlen();
   state.reset(this, isa.get_max_isa());
-  mmu->flush_tlb();
   if (any_vector_extensions())
     VU.reset();
   in_wfi = false;
@@ -222,7 +221,7 @@ void processor_t::set_spmp_addr_entry()
   }
 
   for (size_t i = 0; i < (state.max_pmp - n_pmp); ++i) {
-    state.pmpaddr[n_pmp+i] = std::make_shared<spmpaddr_csr_t>(this, n_pmp+i);
+    state.pmpaddr[n_pmp+i] = std::make_shared<spmpaddr_csr_t>(this, i);
     state.mireg[0]->add_ireg_proxy(0x100+i, state.pmpaddr[n_pmp+i]);
     state.nonvirtual_sireg[0]->add_ireg_proxy(0x100+i, state.pmpaddr[n_pmp+i]);
   }
@@ -670,7 +669,7 @@ reg_t processor_t::throw_instruction_address_misaligned(reg_t pc)
 
 insn_func_t processor_t::decode_insn(insn_t insn)
 {
-  const auto& pool = opcode_map[insn.bits() % std::size(opcode_map)];
+  const auto& pool = opcode_map[insn.bits() % 128];
 
   for (auto p = pool.begin(); ; ++p) {
     if ((insn.bits() & p->mask) == p->match) {
@@ -690,7 +689,7 @@ void processor_t::build_opcode_map()
 {
   bool rve = extension_enabled('E');
   bool zca = extension_enabled(EXT_ZCA);
-  const size_t N = std::size(opcode_map);
+  const size_t N = 128;
 
   auto build_one = [&](const insn_desc_t& desc) {
     auto func = desc.func(xlen, rve, log_commits_enabled);
@@ -771,13 +770,8 @@ void processor_t::register_base_instructions()
     name##_overlapping = true; \
     if (isa.extension_enabled(ext)) \
       DEFINE_INSN_UNCOND(name);
-  #define DECLARE_OVERLAP_INSN_RV64(name, ext) \
-    name##_overlapping = true; \
-    if (isa.extension_enabled(ext) && xlen == 64) \
-      DEFINE_INSN_UNCOND(name);
   #include "overlap_list.h"
   #undef DECLARE_OVERLAP_INSN
-  #undef DECLARE_OVERLAP_INSN_RV64
 
   // add all other instructions.  since they are non-overlapping, the order
   // does not affect correctness, but more frequent instructions should
